@@ -1,63 +1,34 @@
-let request = require("request");
-let fetchMyIP = callback => {
-  request(`https://api.ipify.org?format=json`, (error, response, body) => {
-    let data = JSON.parse(body);
-    if (error) {
-      callback(error, null);
-      return;
-    } else if (response.statusCode != 200) {
-      return callback("error, response not 200", null);
-    } else if (data.ip) {
-      return callback(null, data.ip);
-    } else {
-      return callback("error, IP not found", data.ip);
-    }
-  });
+let request = require("request-promise-native");
+let fetchMyIP = () => {
+  return request(`https://api.ipify.org?format=json`);
 };
 
-let fetchCoordsByIP = (ip, callback) => {
-  request(`https://ipvigilante.com/${ip}`, (error, response, body) => {
-    let data = JSON.parse(body);
-    if (error) {
-      console.log("error");
-      callback(error, null);
-      return;
-    } else if (response.statusCode != 200) {
-      return callback("error, responsecode not 200", null);
-    } else if (data.status) {
-      //console.log("returning coordinates");
-      return callback(null, {
-        latitude: data.data.latitude,
-        longitude: data.data.longitude
-      });
-    } else {
-      console.log("error");
-      return callback("error, coordinates not found", null);
-    }
-  });
+let fetchCoordsByIP = data => {
+  let ip = JSON.parse(data).ip;
+  return request(`https://ipvigilante.com/${ip}`);
 };
 
-const ISSByCoords = function(coords, callback) {
-  const url = `http://api.open-notify.org/iss-pass.json?lat=${coords.latitude}&lon=${coords.longitude}`;
-
-  request(url, (error, response, body) => {
-    if (error) {
-      callback(error, null);
-      return;
-    }
-    if (response.statusCode !== 200) {
-      callback(
-        Error(
-          `Status Code ${response.statusCode} when fetching ISS pass times: ${body}`
-        ),
-        null
-      );
-      return;
-    }
-    const passes = JSON.parse(body).response;
-    callback(null, passes);
-  });
+const fetchISSFlyOverTimes = data => {
+  let { latitude, longitude } = JSON.parse(data).data;
+  return request(
+    `http://api.open-notify.org/iss-pass.json?lat=${latitude}&lon=${longitude}`
+  );
 };
 //
 
-http: module.exports = { fetchMyIP, fetchCoordsByIP, ISSByCoords };
+let nextISSTimesForMyLocation = () => {
+  return fetchMyIP()
+    .then(fetchCoordsByIP)
+    .then(fetchISSFlyOverTimes)
+    .then(body => {
+      const { response } = JSON.parse(body);
+      return response;
+    });
+};
+
+module.exports = {
+  fetchMyIP,
+  fetchCoordsByIP,
+  fetchISSFlyOverTimes,
+  nextISSTimesForMyLocation
+};
